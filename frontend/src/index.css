@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+html,
+body,
+#root {
+    height: 100%;
+}
+
+
+/* Simple utility to constrain content widths */
+.container-prose {
+    @apply max-w-6xl mx-auto px-4;
+}
