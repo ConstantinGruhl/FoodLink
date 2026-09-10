@@ -1,0 +1,119 @@
+# Portable deployment specification; this file does not provision or deploy hosting.
+# Supply required values via a protected env file or your container secret manager.
+name: foodlink-production
+
+x-runtime: &runtime
+  NODE_ENV: production
+  PORT: 8080
+  TRUST_PROXY: 1
+  DATABASE_URL: ${DATABASE_URL:?Set a private PostgreSQL URL with unique credentials}
+  APP_ORIGIN: https://${APP_DOMAIN:?Set the intended HTTPS application domain}
+  PUBLIC_APP_URL: https://${APP_DOMAIN}
+  COOKIE_SECURE: 'true'
+  MIGRATE_ON_START: 'false'
+  S3_ENDPOINT: ${S3_ENDPOINT:?Set a maintained private HTTPS S3 endpoint}
+  S3_REGION: ${S3_REGION:?Set S3 region}
+  S3_FORCE_PATH: ${S3_FORCE_PATH:-false}
+  S3_ACCESS_KEY: ${S3_ACCESS_KEY:?Set bucket-scoped S3 credentials}
+  S3_SECRET_KEY: ${S3_SECRET_KEY:?Set bucket-scoped S3 secret}
+  S3_BUCKET: ${S3_BUCKET:?Set private preprovisioned bucket}
+  AUTO_CREATE_BUCKET: 'false'
+  MAIL_MODE: smtp
+  SMTP_HOST: ${SMTP_HOST:?Set SMTP host}
+  SMTP_PORT: ${SMTP_PORT:-465}
+  SMTP_SECURE: ${SMTP_SECURE:-true}
+  SMTP_REQUIRE_TLS: ${SMTP_REQUIRE_TLS:-true}
+  SMTP_USER: ${SMTP_USER:?Set SMTP user}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:?Set SMTP password}
+  MAIL_FROM: ${MAIL_FROM:?Set verified sender identity}
+  ORGANIZATION_NAME: ${ORGANIZATION_NAME:?Set operating organization}
+  CURRENCY: ${CURRENCY:-EUR}
+  TIMEZONE: ${TIMEZONE:-Europe/Berlin}
+  SUPPORT_EMAIL: ${SUPPORT_EMAIL:?Set support contact email}
+  ORGANIZATION_ADDRESS: ${ORGANIZATION_ADDRESS:?Set operator contact address}
+  PRIVACY_CONTACT: ${PRIVACY_CONTACT:?Set privacy contact}
+  RETENTION_DAYS: ${RETENTION_DAYS:-365}
+  PAYMENTS_ENABLED: ${PAYMENTS_ENABLED:-false}
+  STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+  STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+
+services:
+  db:
+    image: postgres:16.15@sha256:f1c3376c26f2609ab9f29f71f824103fe2fcd8ee0346485cb6122a4f93df6f94
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: foodlink
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a unique strong database password}
+      POSTGRES_DB: foodlink
+    volumes: [production-db:/var/lib/postgresql/data]
+    networks: [data]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U foodlink -d foodlink']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    logging: &logging
+      driver: json-file
+      options: { max-size: 10m, max-file: '5' }
+
+  migrate:
+    image: ${BACKEND_IMAGE:?Set tested immutable backend image digest}
+    profiles: [tools]
+    command: [node, dist/migrate.js]
+    environment:
+      <<: *runtime
+      DATABASE_URL: ${MIGRATION_DATABASE_URL:?Set schema owner URL separately from the runtime app user}
+    networks: [data, egress]
+    depends_on:
+      db: { condition: service_healthy }
+
+  backend:
+    image: ${BACKEND_IMAGE}
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    environment: *runtime
+    networks: [data, app, egress]
+    depends_on:
+      db: { condition: service_healthy }
+    logging: *logging
+
+  frontend:
+    image: ${FRONTEND_IMAGE:?Set tested immutable frontend image digest}
+    restart: unless-stopped
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    networks: [app]
+    depends_on:
+      backend: { condition: service_healthy }
+    logging: *logging
+
+  ingress:
+    image: caddy@sha256:df7f1c2fb114453b951de51a98efc010db1655a92c2e86be6706714e2417a78d
+    restart: unless-stopped
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?Set certificate contact email}
+    ports: ['80:80', '443:443', '443:443/udp']
+    volumes:
+      - ./ops/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks: [app, egress]
+    depends_on:
+      frontend: { condition: service_healthy }
+    logging: *logging
+
+networks:
+  data: { internal: true }
+  app: { internal: true }
+  egress:
+volumes:
+  production-db:
+  caddy-data:
+  caddy-config:

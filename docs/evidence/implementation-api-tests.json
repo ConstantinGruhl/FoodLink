@@ -1,0 +1,84 @@
+{
+  "checkedAt": "2026-09-09T19:16:47Z",
+  "result": "passed",
+  "command": "node scripts/test.mjs",
+  "testImage": "foodlink-backend:test",
+  "imageDigest": "sha256:c29b4730659855d4b2abd62317c07befbbab200ec8fe0ea132da7e8df1029ad0",
+  "nodeVersion": "24.20.0",
+  "containerUser": "node",
+  "database": "foodlink_test in independent ephemeral PostgreSQL16.15 cluster",
+  "migrations": {
+    "applied": 6,
+    "freshReapplication": "passed",
+    "legacyUpgradeAndReapplication": "passed",
+    "originalIdsAndStockPreserved": true,
+    "leastPrivilegeRuntimeGrants": "passed"
+  },
+  "coreApi": {
+    "passed": 23,
+    "failed": 0,
+    "skipped": 0,
+    "durationMs": 67427.032522,
+    "scenarios": [
+      "Readiness, camelCase response contracts and anonymous access boundaries",
+      "Real password login, protected session cookies, CSRF/origin checks and malformed inputs",
+      "Registration, captured email verification, replay rejection and recipient eligibility approval",
+      "Owned donor offer remains unavailable until staff receipt, preserving original quantity",
+      "Invalid quantities, negative contributions, spoofed identity and atomic basket rollback",
+      "Idempotency replay returns same reservation and rejects different body with same key",
+      "Last-unit concurrent reservation has exactly one winner and no negative stock",
+      "Simultaneous identical idempotency submissions create one order and one stock movement",
+      "Cancellation restores stock once and preserves history",
+      "Early pickup blocked, valid pickup redeemed once and impact matches distributed weight",
+      "No-show, item expiry and event cancellation reconcile stock",
+      "Private offered images, valid PNG decoding/WebP reencoding, type/size/truncation rejection, ownership and deletion",
+      "Delivery assignment, required proof, authorized completion and replay rejection",
+      "Surplus allocation restrictions, disabled purchases and rejected unsigned payment events",
+      "Accurate period reports, scoped notifications, disposal ledger and administrative audits",
+      "Password recovery through captured SMTP revokes prior sessions and rejects token replay",
+      "Disabled account sessions revoked, last admin protected, ledger balances reconcile, no leaked transactions",
+      "Expired sessions rejected, personal exports scoped, volunteer tasks assigned and completed",
+      "Password recovery invalidates an in-flight login using the previous password",
+      "Full-period report totals remain accurate above the 2000-detail limit",
+      "Assignment directory filters active verified staff before pagination and redacts unrelated user details",
+      "Deactivation serializes with an in-flight reservation; anonymization refuses active work",
+      "Stale donation and profile writes cannot recreate personal records after disable"
+    ]
+  },
+  "paymentWebhooks": {
+    "passed": 12,
+    "failed": 0,
+    "skipped": 0,
+    "durationMs": 866.773856,
+    "scenarios": [
+      "Forged and stale signatures cannot change data",
+      "Payment amount, currency, session and order must match stored values",
+      "Paid confirmation is exactly once and later expiry cannot cancel it",
+      "Asynchronous payment success required after unpaid checkout completion",
+      "Failed/expired pending checkout restores stock once",
+      "Late payment queues a refund and cannot resurrect inventory",
+      "Refund releases uncollected stock once and rejects payment replay reversal",
+      "Refund preserves completed fulfillment and distributed stock",
+      "Pending/failed refunds block collection and validate amount",
+      "Refund before confirmation remains refunded after delayed confirmation",
+      "Partial refund queues remaining balance without reporting full refund",
+      "Administrator retry preserves attempt identity and ignores superseded failures"
+    ],
+    "providerRequests": "none; synthetic signatures/test credentials, background provider processing disabled"
+  },
+  "deliveryChecks": {
+    "composeConfiguration": "passed for development, tests and synthetic production settings",
+    "missingProductionConfiguration": "rejected",
+    "caddyConfiguration": "passed with --network none; no certificates requested",
+    "repositoryHygiene": "passed",
+    "ownedFileFormatting": "passed",
+    "testContainerAndNetworkCleanup": "passed"
+  },
+  "notes": [
+    "SQL-backed acceptance testing exposed and led to a fix for a reserved-word alias in the impact query",
+    "All tests used isolated test databases, private local object storage and captured local SMTP",
+    "Original development data and volumes were not removed or reset",
+    "No hosting deployment, external email send or real payment was performed",
+    "Final regression runs include independent review fixes and owner-only pickup ticket visibility; a test-only PostgreSQL lock barrier was corrected to follow indirect wait chains"
+  ]
+}

@@ -40,6 +40,8 @@ Explore the [frontend](frontend), [backend](backend) and [database](db).
 
 FoodLink is an evolving prototype. The next development phase focuses on multiple charities and locations, scoped manager permissions, donation requests, spreadsheet imports, household allowances and flexible distribution events with controlled surplus sales.
 
+**Development status:** The current branch includes unfinished multi-charity integration and does not yet pass the backend build. See the [development status](docs/DEVELOPMENT_STATUS.md) for the current checkpoint and remaining work.
+
 ---
 
 Built by [Constantin Gruhl](https://github.com/ConstantinGruhl) as part of my software development portfolio.

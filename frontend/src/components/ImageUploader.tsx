@@ -1,33 +1,80 @@
-// src/components/ImageUploader.tsx
-import { useState } from "react"
-import { api } from "@/lib/api"
-
-export default function ImageUploader({ itemId, onUploaded }: { itemId: string; onUploaded?: () => void }) {
-    const [file, setFile] = useState<File | null>(null)
-    const [busy, setBusy] = useState(false)
-    const [error, setError] = useState<string | null>(null)
-
-    const doUpload = async () => {
-        if (!file) return
-        setBusy(true); setError(null)
-        try {
-            const { data } = await api.post("/uploads/presign", { itemId, contentType: file.type })
-            await fetch(data.url, { method: "PUT", headers: { "Content-Type": file.type }, body: file })
-            await api.post(`/items/${itemId}/images`, { objectKey: data.objectKey, publicUrl: data.publicUrl, alt: file.name, isPrimary: true })
-            onUploaded?.()
-            setFile(null)
-        } catch (e: any) {
-            setError(e.message || "Upload failed")
-        } finally { setBusy(false) }
-    }
-
-    return (
-        <div className="flex items-center gap-3">
-            <input type="file" accept="image/png,image/jpeg,image/webp" onChange={e => setFile(e.target.files?.[0] ?? null)} />
-            <button disabled={!file || busy} onClick={doUpload} className="px-3 py-2 rounded-lg bg-brand-600 text-white disabled:opacity-50">
-                {busy ? "Uploading…" : "Upload"}
-            </button>
-            {error && <span className="text-sm text-red-600">{error}</span>}
+import { useState } from 'react'
+import { Upload, Trash2 } from 'lucide-react'
+import { request } from '../lib/api'
+import { useAction } from '../lib/hooks'
+import { imageSchema, okSchema, type Item } from '../lib/schemas'
+import { ActionMessages, Field } from './ui'
+export default function ImageUploader({ item, onChange }: { item: Item; onChange: () => void }) {
+  const action = useAction(),
+    [file, setFile] = useState<File | null>(null),
+    [key, setKey] = useState(0)
+  async function upload() {
+    if (!file) return
+    await action.run(async () => {
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type))
+        throw new Error('Choose a JPEG, PNG or WebP image.')
+      if (file.size > 5 * 1024 * 1024) throw new Error('Choose an image smaller than 5 MB.')
+      await request(`/items/${item.id}/images`, imageSchema, {
+        method: 'POST',
+        headers: { 'Content-Type': file.type, 'X-Image-Alt': item.name.replace(/[^\x20-\x7E]/g, '') },
+        body: file,
+      })
+      setFile(null)
+      setKey((v) => v + 1)
+      onChange()
+    }, 'Image uploaded.')
+  }
+  return (
+    <div className="stack">
+      <ActionMessages error={action.error} success={action.success} />
+      {item.images.length > 0 && (
+        <div className="row">
+          {item.images.map((image) => (
+            <div key={image.id} className="stack" style={{ gap: '.3rem', width: 100 }}>
+              <img
+                src={image.url}
+                alt={image.alt || item.name}
+                width={100}
+                height={80}
+                style={{ height: 80, objectFit: 'cover', borderRadius: 8 }}
+                loading="lazy"
+              />
+              <button
+                className="btn danger small"
+                disabled={action.pending}
+                onClick={() =>
+                  void action.run(async () => {
+                    await request(`/items/${item.id}/images/${image.id}`, okSchema, { method: 'DELETE' })
+                    onChange()
+                  }, 'Image removed.')
+                }
+                aria-label={`Remove image of ${item.name}`}
+              >
+                <Trash2 size={14} />
+                Remove
+              </button>
+            </div>
+          ))}
         </div>
-    )
+      )}
+      <div className="inline-form">
+        <Field label={`Add photo of ${item.name}`} hint="JPEG, PNG or WebP, up to 5 MB.">
+          <input
+            key={key}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={(e) => setFile(e.target.files?.[0] || null)}
+          />
+        </Field>
+        <button
+          className="btn secondary small"
+          disabled={!file || action.pending}
+          onClick={() => void upload()}
+        >
+          <Upload size={15} />
+          {action.pending ? 'Uploading…' : 'Upload photo'}
+        </button>
+      </div>
+    </div>
+  )
 }

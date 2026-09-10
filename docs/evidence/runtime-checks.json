@@ -1,0 +1,90 @@
+{
+  "assessedAt": "2026-09-08T22:14:26.802Z",
+  "scope": "Local newly initialized demo database; temporary smoke records removed",
+  "before": {
+    "users": 5,
+    "items": 4,
+    "donations": 0,
+    "orders": 0
+  },
+  "results": [
+    {
+      "check": "Email-only demo login for donor, recipient, buyer, admin",
+      "statuses": [
+        200,
+        200,
+        200,
+        200
+      ]
+    },
+    {
+      "check": "POST /auth/register",
+      "status": 404
+    },
+    {
+      "check": "GET /orders/mine",
+      "status": 404
+    },
+    {
+      "check": "POST /events",
+      "status": 404
+    },
+    {
+      "check": "Create donation with two temporary items",
+      "status": 200,
+      "items": 2
+    },
+    {
+      "check": "Donation appears in donor history",
+      "status": 200,
+      "found": true
+    },
+    {
+      "check": "Scheduled/unreceived donation already visible in recipient catalog",
+      "visible": true
+    },
+    {
+      "check": "Reserve temporary donation item",
+      "status": 200,
+      "orderCreated": true,
+      "remaining": 2
+    },
+    {
+      "check": "Buy temporary surplus item (database order only, no payment)",
+      "status": 200,
+      "totalCents": 50,
+      "remaining": 2
+    },
+    {
+      "check": "PATCH /donations/:id",
+      "status": 404
+    },
+    {
+      "check": "Upload presign",
+      "status": 200,
+      "uploadHost": "minio:9000",
+      "publicHost": "localhost:9000"
+    },
+    {
+      "check": "Donation history original quantity after reservation",
+      "quantity": 2,
+      "original": 3
+    },
+    {
+      "check": "Impact response field names",
+      "keys": [
+        "id",
+        "total_meals_distributed",
+        "total_kg_saved",
+        "total_donors",
+        "total_buyers"
+      ]
+    }
+  ],
+  "after": {
+    "users": 5,
+    "items": 4,
+    "donations": 0,
+    "orders": 0
+  }
+}

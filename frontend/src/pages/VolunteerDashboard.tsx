@@ -1,89 +1,155 @@
-// src/pages/VolunteerDashboard.tsx
-import { useEffect, useState } from 'react'
-import { Button, Card, Input, Label, Select } from '@/components/ui'
-import { jsPDF } from 'jspdf'
-import { useAuth } from '@/store/useAuth'
-import { useData } from '@/store/useData'
-
-const MustLogin = ({ role }: { role: string }) =>
-    <Card className="max-w-lg mx-auto"><p>Please login as <b>{role}</b> to access this area.</p></Card>
-
-export default function VolunteerDashboard() {
-    const { user } = useAuth()
-    const { items, donations, events, orders, createEvent, updateDonationStatus, loadNextEvent } = useData()
-    const [evt, setEvt] = useState({ date: '', location: '', pickupWindow: '10:00–13:00', allowDelivery: true })
-
-    useEffect(() => { loadNextEvent() }, [])
-    if (!user || user.role !== 'volunteer') return <MustLogin role="volunteer" />
-
-    const expectedSurplus = Math.max(items.reduce((s, i) => s + (i.isSurplus ? i.qty : 0), 0), 0)
-
-    const addEvent = () => {
-        if (!evt.date || !evt.location) return alert('Fill date and location')
-        createEvent({ date: new Date(evt.date).toISOString(), location: evt.location, pickupWindow: evt.pickupWindow, allowDelivery: evt.allowDelivery })
-        setEvt({ date: '', location: '', pickupWindow: '10:00–13:00', allowDelivery: true })
-    }
-
-    const exportWeekly = () => {
-        const doc = new jsPDF()
-        doc.text('Weekly Report', 20, 20)
-        doc.text('Donations: ' + donations.length, 20, 35)
-        doc.text('Orders: ' + orders.length, 20, 45)
-        doc.text('Expected Surplus: ' + expectedSurplus, 20, 55)
-        doc.save('weekly-report.pdf')
-    }
-
-    return (
-        <div className="space-y-4">
-            <h2 className="text-2xl font-semibold">Volunteer Operations</h2>
-            <Card>
-                <h3 className="font-semibold mb-2">At a Glance</h3>
-                <div className="grid md:grid-cols-4 gap-3">
-                    <Stat title="Items Donated" value={donations.reduce((s, d) => s + d.items.reduce((a, b) => a + b.qty, 0), 0).toString()} />
-                    <Stat title="Items Requested" value={orders.filter(o => o.type === 'recipient-reservation').reduce((s, o) => s + o.items.reduce((a, b) => a + b.qty, 0), 0).toString()} />
-                    <Stat title="Expected Surplus" value={expectedSurplus.toString()} />
-                    <Stat title="Events" value={events.length.toString()} />
-                </div>
-            </Card>
-            <Card>
-                <h3 className="font-semibold mb-2">Create Distribution Event</h3>
-                <div className="grid md:grid-cols-4 gap-3">
-                    <div><Label>Date (Saturday)</Label><Input type="date" value={evt.date} onChange={e => setEvt({ ...evt, date: e.target.value })} /></div>
-                    <div><Label>Location</Label><Input value={evt.location} onChange={e => setEvt({ ...evt, location: e.target.value })} /></div>
-                    <div><Label>Pickup Window</Label><Input value={evt.pickupWindow} onChange={e => setEvt({ ...evt, pickupWindow: e.target.value })} /></div>
-                    <div>
-                        <Label>Home Delivery</Label>
-                        <Select value={String(evt.allowDelivery)} onChange={e => setEvt({ ...evt, allowDelivery: e.target.value === 'true' })}>
-                            <option value="true">Enabled</option><option value="false">Disabled</option>
-                        </Select>
-                    </div>
-                </div>
-                <div className="mt-3"><Button onClick={addEvent}>Save Event</Button></div>
-            </Card>
-            <Card>
-                <h3 className="font-semibold mb-2">Donation Management</h3>
-                <div className="space-y-2">
-                    {donations.length === 0 ? <p className="text-gray-500">No donations yet.</p> : donations.map(d => (
-                        <div key={d.id} className="grid md:grid-cols-5 gap-2 border rounded-xl p-3">
-                            <div className="md:col-span-3">
-                                <div className="font-medium">{d.id} · {new Date(d.date).toDateString()}</div>
-                                <div className="text-xs text-gray-500">{d.items.map(i => `${i.name}(${i.qty})`).join(', ')}</div>
-                            </div>
-                            <Select value={d.status} onChange={e => updateDonationStatus(d.id, e.target.value as any)}>
-                                <option value="scheduled">Scheduled</option>
-                                <option value="received">Received</option>
-                                <option value="distributed">Distributed</option>
-                                <option value="cancelled">Cancelled</option>
-                            </Select>
-                            <Button onClick={exportWeekly}>Export Weekly Report</Button>
-                        </div>
-                    ))}
-                </div>
-            </Card>
-        </div>
-    )
+import { useState, type FormEvent } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { ClipboardList, PackageCheck, ScanLine, Truck } from 'lucide-react'
+import { z } from 'zod'
+import { mutation } from '../lib/api'
+import { useQuery, useAction } from '../lib/hooks'
+import { donationSchema, orderSchema, type Order } from '../lib/schemas'
+import { ActionMessages, Empty, ErrorPanel, Field, Loading, PageHead, Pagination } from '../components/ui'
+import DonationRecord from '../components/DonationRecord'
+import EventManagement from '../components/EventManagement'
+import InventoryManagement from '../components/InventoryManagement'
+import TaskManagement from '../components/TaskManagement'
+import DeliveryManagement from '../components/DeliveryManagement'
+import TicketScanner from '../components/TicketScanner'
+import OrderCard from '../components/OrderCard'
+function Receiving() {
+  const [offset, setOffset] = useState(0),
+    query = useQuery(`/donations?limit=50&offset=${offset}`, z.array(donationSchema))
+  const [all, setAll] = useState(false)
+  return (
+    <div className="stack">
+      <div className="between">
+        <h2>Receive food offers</h2>
+        <label className="check small">
+          <input type="checkbox" checked={all} onChange={(e) => setAll(e.target.checked)} />
+          Include received and cancelled
+        </label>
+      </div>
+      {query.loading ? (
+        <Loading />
+      ) : query.error ? (
+        <ErrorPanel error={query.error} retry={query.reload} />
+      ) : query.data?.filter((d) => all || ['scheduled', 'offered'].includes(d.status)).length ? (
+        query.data
+          .filter((d) => all || ['scheduled', 'offered'].includes(d.status))
+          .map((d) => <DonationRecord key={d.id} donation={d} staff onChange={query.reload} />)
+      ) : (
+        <Empty title="No food offers waiting here">
+          New donor offers appear here before entering available inventory.
+        </Empty>
+      )}
+      <Pagination offset={offset} count={query.data?.length || 0} setOffset={setOffset} />
+    </div>
+  )
 }
-
-function Stat({ title, value }: { title: string; value: string }) {
-    return <Card><div className="text-gray-500 text-sm">{title}</div><div className="text-2xl font-semibold">{value}</div></Card>
+function Pickups() {
+  const action = useAction(),
+    [token, setToken] = useState(''),
+    [result, setResult] = useState<Order | null>(null),
+    [offset, setOffset] = useState(0),
+    query = useQuery(`/orders?limit=50&offset=${offset}`, z.array(orderSchema))
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    await action.run(async () => {
+      const order = await mutation('/orders/redeem', orderSchema, { token: token.trim() })
+      setResult(order)
+      setToken('')
+      query.reload()
+    }, 'Pickup confirmed. This ticket is now used and cannot be redeemed again.')
+  }
+  return (
+    <div className="stack-lg">
+      <section className="card stack">
+        <h2>Verify a food pickup</h2>
+        <p className="muted">
+          Scan or enter the recipient’s ticket, check the basket, then confirm handover. A ticket can be
+          redeemed once.
+        </p>
+        <TicketScanner onDetected={setToken} />
+        <ActionMessages error={action.error} success={action.success} />
+        <form className="stack" onSubmit={submit}>
+          <Field label="Collection ticket" required>
+            <textarea
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+              required
+              maxLength={1000}
+              placeholder="Scan a QR code or paste the text ticket"
+            />
+          </Field>
+          <button className="btn" disabled={action.pending || !token.trim()}>
+            <ScanLine size={17} />
+            {action.pending ? 'Verifying…' : 'Confirm food handover'}
+          </button>
+        </form>
+      </section>
+      {result && <OrderCard order={result} staff onChange={() => setResult(null)} />}
+      <h2>Recent reservations & orders</h2>
+      {query.loading ? (
+        <Loading />
+      ) : query.error ? (
+        <ErrorPanel error={query.error} retry={query.reload} />
+      ) : query.data?.length ? (
+        query.data.map((order) => <OrderCard key={order.id} order={order} staff onChange={query.reload} />)
+      ) : (
+        <Empty title="No orders yet" />
+      )}
+      <Pagination offset={offset} count={query.data?.length || 0} setOffset={setOffset} />
+    </div>
+  )
+}
+export default function VolunteerDashboard() {
+  const [params, setParams] = useSearchParams(),
+    tab = params.get('tab') || 'receive'
+  const tabs = [
+    ['receive', 'Receiving', PackageCheck],
+    ['inventory', 'Inventory', ClipboardList],
+    ['events', 'Events', ClipboardList],
+    ['pickups', 'Pickups', ScanLine],
+    ['tasks', 'Tasks', ClipboardList],
+    ['deliveries', 'Deliveries', Truck],
+  ] as const
+  return (
+    <>
+      <PageHead
+        eyebrow="Team operations"
+        title="A smoother day of sharing."
+        description="Receive donations, manage available food, coordinate the team and confirm every handover."
+        action={
+          <Link className="btn secondary" to="/reports">
+            Reports & export
+          </Link>
+        }
+      />
+      <nav className="tabs no-print" aria-label="Operations sections">
+        {tabs.map(([id, label, Icon]) => (
+          <button
+            key={id}
+            className={`btn small ${tab === id ? '' : 'secondary'}`}
+            aria-pressed={tab === id}
+            onClick={() => setParams({ tab: id })}
+          >
+            <Icon size={16} />
+            {label}
+          </button>
+        ))}
+      </nav>
+      {tab === 'receive' ? (
+        <Receiving />
+      ) : tab === 'inventory' ? (
+        <InventoryManagement />
+      ) : tab === 'events' ? (
+        <EventManagement />
+      ) : tab === 'pickups' ? (
+        <Pickups />
+      ) : tab === 'tasks' ? (
+        <TaskManagement />
+      ) : tab === 'deliveries' ? (
+        <DeliveryManagement />
+      ) : (
+        <Receiving />
+      )}
+    </>
+  )
 }

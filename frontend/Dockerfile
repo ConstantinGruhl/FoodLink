@@ -1,32 +1,14 @@
-# frontend/Dockerfile
-FROM node:20-alpine AS build
+FROM node:24.20.0-alpine3.23@sha256:0388af2af070cd4736a1567cfed02469ba117848845b4165d87a333edb53d2ca AS build
 WORKDIR /app
-COPY package.json package-lock.json* ./
+COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
+ENV VITE_API_URL=/api
 RUN npm run build
 
-FROM nginx:1.27-alpine
-WORKDIR /usr/share/nginx/html
-COPY --from=build /app/dist ./
-# Nginx config with API reverse proxy
-COPY <<'NGINX' /etc/nginx/conf.d/default.conf
-server {
-  listen 80;
-  server_name _;
-  root /usr/share/nginx/html;
-  index index.html;
-  include /etc/nginx/mime.types;
-
-  location / {
-    try_files $uri /index.html;
-  }
-
-  location /api {
-    proxy_pass http://backend:8080/api;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-  }
-}
-NGINX
-EXPOSE 80
+FROM nginxinc/nginx-unprivileged@sha256:442753882674b49ae2c1de83ed67896131c0777f56df5005e356e62bc3f7e7ce AS runtime
+COPY --from=build /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+USER 101
+EXPOSE 8080
+HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=5 CMD wget --quiet --spider http://127.0.0.1:8080/healthz || exit 1

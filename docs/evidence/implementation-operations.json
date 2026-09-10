@@ -1,0 +1,78 @@
+{
+  "checkedAt": "2026-09-09T18:55:59Z",
+  "scope": "Local Docker and portable configuration only; no deployment or external provider sends",
+  "runtimeBuild": {
+    "result": "passed",
+    "nodeVersion": "24.20.0",
+    "runtimeUser": "node",
+    "readOnlyRootFilesystem": true,
+    "temporaryWritableFilesystem": "/tmp",
+    "cleanLinuxDependencyInstall": true,
+    "npmAuditAtBuild": { "vulnerabilities": 0 }
+  },
+  "composeValidation": {
+    "result": "passed",
+    "developmentPorts": "127.0.0.1 only",
+    "testPorts": "none published",
+    "testProject": "foodlink-tests",
+    "testDatabase": "foodlink_test",
+    "testStorage": "ephemeral isolated MinIO",
+    "testMail": "private Mailpit capture only",
+    "productionMissingConfiguration": "rejected",
+    "productionSyntheticConfiguration": "valid without starting services",
+    "productionExposedServices": ["HTTPS ingress only"],
+    "productionDatabaseAndApplicationNetworks": "internal"
+  },
+  "ingressSyntax": { "result": "passed", "network": "none", "certificateRequests": "none", "method": "Pinned Caddy container validate command" },
+  "migrationUpgrade": {
+    "result": "passed",
+    "fixture": "tests/legacy-baseline.sql from original committed schema",
+    "target": "foodlink_upgrade_test inside ephemeral test cluster",
+    "checks": [
+      "Fresh migrations applied and reapplied without changes",
+      "Legacy row identifiers retained",
+      "Legacy item names and stock quantities retained",
+      "Opening stock ledger matches migrated inventory",
+      "Migration does not silently set passwords for existing users"
+    ]
+  },
+  "leastPrivilegeRole": {
+    "result": "passed",
+    "role": "foodlink_app in isolated test cluster",
+    "checks": [
+      "Runtime role has normal application data access",
+      "Not a PostgreSQL superuser",
+      "Cannot create schema objects",
+      "Cannot modify migration records",
+      "Can append stock, audit and payment-event history",
+      "Cannot update or delete append-only history"
+    ]
+  },
+  "databaseRecovery": {
+    "result": "passed",
+    "method": "Exported transaction snapshot, custom pg_dump archive, SHA-256 checksum and matching snapshot count manifest",
+    "legacyArchiveRestore": "foodlink_restore_bcbc49f01abd43b3",
+    "legacySnapshotRestore": "foodlink_restore_27b9d31413f84447",
+    "legacyCounts": { "users": 5, "donations": 0, "donation_items": 0, "items": 4, "orders": 0, "order_items": 0, "item_images": 0 },
+    "upgradedWorkflowArchive": "foodlink_test-2026-09-09T18-48-02-299Z.dump",
+    "upgradedWorkflowRestore": "foodlink_restore_a22a3691db2c4af7 inside isolated test cluster",
+    "upgradedCounts": { "users": 9, "donations": 11, "donation_items": 13, "items": 13, "orders": 7, "order_items": 7, "item_images": 0 },
+    "checks": ["Snapshot counts match all seven tables", "Foreign-key relationships intact", "No negative stock", "Migration records present", "Inventory balances match movement ledger"],
+    "existingDevelopmentData": "preserved"
+  },
+  "objectRecovery": {
+    "result": "passed",
+    "objectsVerified": 1,
+    "source": "Actual processed image uploaded during API acceptance tests",
+    "archive": "foodlink-objects-141e03af-b427-4ab2-b07d-e72078396b61.ndjson",
+    "isolatedDestinationBucket": "foodlink-restore-a276eed8-0fa0-4f39-b9a6-1db43f962d91",
+    "verification": "Per-object SHA-256 matched after restoration and re-download",
+    "notes": "The API image deletion test had removed image metadata; its deferred-cleanup object remained available for recovery verification. The isolated test cluster is intentionally disposable."
+  },
+  "limits": [
+    "Database and object exports are individually verified, not a cross-system atomic snapshot",
+    "Local backups do not replace encrypted off-host backups",
+    "Production provider recovery, certificate issuance and external alert delivery were not performed",
+    "Pinned archived MinIO is a development compatibility fixture only"
+  ]
+}

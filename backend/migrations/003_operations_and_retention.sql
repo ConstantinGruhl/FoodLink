@@ -1,0 +1,13 @@
+ALTER TABLE donation_items DROP CONSTRAINT donation_items_donation_id_fkey;
+ALTER TABLE donation_items DROP CONSTRAINT donation_items_item_id_fkey;
+ALTER TABLE donation_items ADD FOREIGN KEY(donation_id) REFERENCES donations(id) ON DELETE RESTRICT;
+ALTER TABLE donation_items ADD FOREIGN KEY(item_id) REFERENCES items(id) ON DELETE RESTRICT;
+ALTER TABLE order_items DROP CONSTRAINT order_items_order_id_fkey;
+ALTER TABLE order_items DROP CONSTRAINT order_items_item_id_fkey;
+ALTER TABLE order_items ADD FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE RESTRICT;
+ALTER TABLE order_items ADD FOREIGN KEY(item_id) REFERENCES items(id) ON DELETE RESTRICT;
+CREATE TABLE tasks (id uuid PRIMARY KEY DEFAULT gen_random_uuid(),title text NOT NULL,description text NOT NULL DEFAULT '',event_id uuid REFERENCES events(id),assigned_volunteer_id uuid REFERENCES users(id),due_at timestamptz,status text NOT NULL DEFAULT 'open' CHECK(status IN ('open','in-progress','completed','cancelled')),created_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE organization_config(id int PRIMARY KEY CHECK(id=1),data jsonb NOT NULL DEFAULT '{}');
+INSERT INTO organization_config(id) VALUES(1);
+CREATE TABLE privacy_requests(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),user_id uuid NOT NULL REFERENCES users(id),reason text NOT NULL DEFAULT '',status text NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','completed')),created_at timestamptz NOT NULL DEFAULT now(),completed_at timestamptz);
+INSERT INTO audit_log(action,entity_type,details) VALUES('schema.legacy-upgrade','migration','{"note":"Legacy opening balances and donation quantities were inferred from remaining stock. Historical losses cannot be reconstructed. Legacy passwords remain unset; controlled account recovery is required."}');

@@ -1,0 +1,6 @@
+node_modules
+dist
+backups
+coverage
+docs/evidence
+package-lock.json

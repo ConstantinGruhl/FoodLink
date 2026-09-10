@@ -1,0 +1,117 @@
+{
+  "checkedAt": "2026-09-09T19:18:00Z",
+  "scope": "Docker-ready local prototype; no deployment",
+  "automatedTests": {
+    "total": 72,
+    "backendUnit": {
+      "passed": 18,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 693.628159,
+      "environment": "Clean foodlink-backend:unit Docker build, Node24.20.0 Alpine; tests mounted read-only"
+    },
+    "frontend": {
+      "passed": 19,
+      "failed": 0,
+      "skipped": 0,
+      "files": 7,
+      "durationSeconds": 2.97,
+      "environment": "Clean foodlink-frontend:unit Docker build"
+    },
+    "coreApi": {
+      "passed": 23,
+      "failed": 0
+    },
+    "paymentWebhooks": {
+      "passed": 12,
+      "failed": 0,
+      "externalProviderRequests": 0
+    }
+  },
+  "builds": {
+    "backend": "passed strict TypeScript and clean Docker image",
+    "frontend": "passed strict TypeScript and Vite production build",
+    "frontendMainBundle": {
+      "bytes": 261760,
+      "gzipBytes": 81390
+    },
+    "formatter": "passed",
+    "repositoryHygiene": "passed",
+    "gitDiffWhitespace": "passed",
+    "trackedDependencies": 0,
+    "trackedRealEnvironmentFiles": 0
+  },
+  "audits": {
+    "backend": {
+      "scope": "all dependencies including development",
+      "totalVulnerabilities": 0,
+      "evidence": "implementation-backend-audit.json"
+    },
+    "frontend": {
+      "scope": "all dependencies including development",
+      "totalVulnerabilities": 0,
+      "evidence": "implementation-frontend-audit.json"
+    }
+  },
+  "runtime": {
+    "url": "http://localhost:5173",
+    "capturedMail": "http://localhost:8025",
+    "healthLatencyMs": 94,
+    "services": {
+      "backend": "healthy",
+      "frontend": "healthy",
+      "db": "healthy",
+      "minio": "healthy",
+      "mailpit": "healthy"
+    },
+    "developmentVolumesPreserved": true,
+    "productionStarted": false
+  },
+  "browser": {
+    "roles": [
+      "donor",
+      "admin",
+      "recipient",
+      "volunteer",
+      "buyer"
+    ],
+    "checks": [
+      "Donor password login, offer creation and quantity edit 3 to4",
+      "Staff receiving requires explicit receiving check and notes",
+      "Future event creation with booking cutoff, capacity and delivery",
+      "Recipient two-item basket produces one confirmed order",
+      "Order and QR/text ticket survive full page reload",
+      "Volunteer pickup succeeds once; repeated ticket rejected",
+      "Report and public impact reflect 1.5kg,3meal equivalents,1completed order",
+      "Administration people/health screens, user profile and signout",
+      "390px navigation opens/closes and forms remain usable",
+      "Marketplace shows prices, quantity changes update total and payment stays disabled",
+      "Stale lazy-loaded asset after container replacement recovers through Return home"
+    ],
+    "finalSession": "signed out",
+    "cameraPermissionRequested": false,
+    "physicalCameraTested": false,
+    "fixture": "Labelled synthetic browser donation/event/collection retained in local demo data"
+  },
+  "finalDatabaseRestore": {
+    "archive": "backups/foodlink-2026-09-09T19-17-16-365Z.dump",
+    "restoredDatabase": "foodlink_restore_8b10d81c07d84f6a",
+    "counts": {
+      "users": 5,
+      "donations": 2,
+      "donation_items": 4,
+      "items": 8,
+      "orders": 1,
+      "order_items": 2,
+      "item_images": 0
+    },
+    "result": "passed snapshot counts, migrations, foreign keys, stock and ledger",
+    "activeDatabaseOverwritten": false
+  },
+  "limits": [
+    "External SMTP, live Stripe and hosted infrastructure not exercised",
+    "Physical camera and full assistive-technology audit not performed",
+    "Container OS vulnerability scanning and production load testing not performed",
+    "Historical missing weights are not reconstructed"
+  ]
+}

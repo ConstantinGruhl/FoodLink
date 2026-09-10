@@ -1,0 +1,72 @@
+{
+  "assessedDate": "2026-09-09",
+  "timezone": "Europe/Berlin",
+  "baselineCommit": "f0951eef",
+  "setupChange": "Added frontend/.dockerignore excluding node_modules, dist, *.tsbuildinfo, .git",
+  "build": {
+    "originalFrontend": "Failed: tsc: not found after host node_modules copied into image",
+    "frontendAfterFix": "TypeScript and Vite production build passed",
+    "backend": "Container build succeeded using cached build steps; independent local TypeScript --noEmit check passed",
+    "mainJsKB": 1098.22,
+    "mainJsGzipKB": 337.89,
+    "logoKB": 552.05
+  },
+  "services": {
+    "frontend": "Running HTTP 200",
+    "backend": "Running /api/health HTTP 200",
+    "postgres": "Healthy; five users, four items, one event",
+    "minio": "Running; empty data directory, no bucket provisioned"
+  },
+  "browser": [
+    {
+      "route": "/",
+      "result": "Homepage rendered, FoodShare heading vs FoodLink navigation; static chart data in source"
+    },
+    {
+      "route": "/impact",
+      "result": "Blank application",
+      "error": "TypeError: Cannot read properties of undefined (reading 'toLocaleString')"
+    },
+    {
+      "route": "/market",
+      "role": "buyer",
+      "result": "Login succeeded; no product cards; API separately returned surplus yogurt"
+    },
+    {
+      "route": "/recipient",
+      "role": "recipient",
+      "result": "Login succeeded then blank application on cold state",
+      "error": "TypeError: Cannot read properties of undefined (reading 'date')"
+    },
+    {
+      "route": "/donor",
+      "role": "donor",
+      "result": "Product form and empty donation history rendered; writes separately checked through API"
+    },
+    {
+      "route": "/volunteer",
+      "role": "volunteer",
+      "result": "Operations screen rendered with empty counts, one event and event creation form"
+    },
+    {
+      "route": "/admin",
+      "role": "admin",
+      "result": "Users/roles and CMS placeholders rendered; event list empty on fresh page state"
+    },
+    {
+      "route": "/landing",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "result": "Marketing content adapts; main nav links hidden with no mobile menu"
+    }
+  ],
+  "endState": "Logged out; viewport reset; homepage kept available",
+  "limitations": [
+    "No complete browser-based donation-to-pickup flow possible",
+    "No successful image PUT/download or PDF export tested",
+    "No concurrency/load/penetration/restore test",
+    "No production deployment"
+  ]
+}

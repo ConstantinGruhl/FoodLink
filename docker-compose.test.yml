@@ -1,0 +1,129 @@
+name: foodlink-tests
+
+x-test-environment: &test-environment
+  NODE_ENV: test
+  PORT: 8080
+  TRUST_PROXY: 1
+  DATABASE_URL: postgres://foodlink:foodlink@db:5432/foodlink_test
+  APP_ORIGIN: http://localhost:5173
+  PUBLIC_APP_URL: http://localhost:5173
+  COOKIE_SECURE: 'false'
+  MIGRATE_ON_START: 'true'
+  S3_ENDPOINT: http://minio:9000
+  S3_REGION: us-east-1
+  S3_FORCE_PATH: 'true'
+  S3_ACCESS_KEY: testminio
+  S3_SECRET_KEY: testminio-password
+  S3_BUCKET: foodlink-test
+  AUTO_CREATE_BUCKET: 'true'
+  MAIL_MODE: smtp
+  SMTP_HOST: mailpit
+  SMTP_PORT: 1025
+  SMTP_SECURE: 'false'
+  MAIL_FROM: FoodLink tests <noreply@foodlink.local>
+  PAYMENTS_ENABLED: 'false'
+  SEED_DEMO: 'true'
+  DEMO_PASSWORD: FoodLink-test-pass-2026!
+
+services:
+  db:
+    image: postgres:16.15@sha256:f1c3376c26f2609ab9f29f71f824103fe2fcd8ee0346485cb6122a4f93df6f94
+    environment:
+      POSTGRES_USER: foodlink
+      POSTGRES_PASSWORD: foodlink
+      POSTGRES_DB: foodlink_test
+    tmpfs: [/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U foodlink -d foodlink_test']
+      interval: 2s
+      timeout: 5s
+      retries: 30
+  minio:
+    image: minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: testminio
+      MINIO_ROOT_PASSWORD: testminio-password
+    tmpfs: [/data]
+    healthcheck:
+      test: [CMD, curl, --fail, --silent, http://localhost:9000/minio/health/live]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+  mailpit:
+    image: axllent/mailpit@sha256:98b916bd3c8d61f7633a52d3ea2f58d00620cb01ca57ab59edde68c347a95365
+    environment:
+      MP_DISABLE_VERSION_CHECK: 'true'
+    healthcheck:
+      test: [CMD, /mailpit, readyz]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+  backend:
+    image: foodlink-backend:test
+    build: ./backend
+    init: true
+    command: [sh, -c, 'node dist/migrate.js && node dist/seed.js && node dist/server.js']
+    environment: *test-environment
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    depends_on:
+      db: { condition: service_healthy }
+      minio: { condition: service_healthy }
+      mailpit: { condition: service_healthy }
+  tests:
+    image: foodlink-backend:test
+    profiles: [test]
+    command: [node, --test, --test-concurrency=1, /tests/api.test.mjs]
+    environment:
+      <<: *test-environment
+      TEST_API_URL: http://backend:8080/api
+      TEST_MAIL_URL: http://mailpit:8025
+      TEST_DATABASE_URL: postgres://foodlink:foodlink@db:5432/foodlink_test
+      TEST_PASSWORD: FoodLink-test-pass-2026!
+    volumes:
+      - ./tests:/tests:ro
+    depends_on:
+      backend: { condition: service_healthy }
+  payments-backend:
+    image: foodlink-backend:test
+    profiles: [payments-test]
+    init: true
+    environment:
+      <<: *test-environment
+      MIGRATE_ON_START: 'false'
+      SEED_DEMO: 'false'
+      MAIL_MODE: outbox
+      PAYMENTS_ENABLED: 'true'
+      STRIPE_SECRET_KEY: sk_test_offline_fixture
+      STRIPE_WEBHOOK_SECRET: whsec_offline_fixture
+      RUN_BACKGROUND_JOBS: 'false'
+    depends_on:
+      backend: { condition: service_healthy }
+  migration-tests:
+    image: foodlink-backend:test
+    profiles: [test]
+    command: [node, /tests/legacy-upgrade.mjs]
+    environment:
+      <<: *test-environment
+      TEST_DATABASE_URL: postgres://foodlink:foodlink@db:5432/foodlink_test
+    volumes:
+      - ./tests:/tests:ro
+      - ./ops:/ops:ro
+    depends_on:
+      backend: { condition: service_healthy }
+  payments-tests:
+    image: foodlink-backend:test
+    profiles: [payments-test]
+    command: [node, --test, --test-concurrency=1, /tests/payment-webhooks.test.mjs]
+    environment:
+      TEST_API_URL: http://payments-backend:8080/api
+      TEST_DATABASE_URL: postgres://foodlink:foodlink@db:5432/foodlink_test
+      TEST_PASSWORD: FoodLink-test-pass-2026!
+      STRIPE_WEBHOOK_SECRET: whsec_offline_fixture
+    volumes:
+      - ./tests:/tests:ro
+    depends_on:
+      payments-backend: { condition: service_healthy }

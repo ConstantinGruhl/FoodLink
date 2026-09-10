@@ -1,0 +1,55 @@
+name: FoodLink checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.20.0
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            backend/package-lock.json
+            frontend/package-lock.json
+      - name: Install repository tooling and verify formatting
+        run: |
+          npm ci
+          npm run format:check
+      - name: Clean backend install, compile and unit tests
+        working-directory: backend
+        run: |
+          npm ci
+          npm run build
+          npm test
+          npm audit --omit=dev --audit-level=high
+      - name: Clean frontend install and strict production build
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+          npm test
+          npm audit --omit=dev --audit-level=high
+      - name: Container build and isolated database-backed acceptance suite
+        run: |
+          node scripts/validate-containers.mjs
+          node scripts/test.mjs
+      - name: Build frontend runtime container
+        run: docker compose build frontend
+      - name: Reject tracked dependencies, outputs and real environment files
+        run: node scripts/check-repository.mjs
+      - name: Stop isolated test containers
+        if: always()
+        run: docker compose -f docker-compose.test.yml --profile payments-test down --remove-orphans
