@@ -94,7 +94,7 @@ services:
     logging: *logging
 
   ingress:
-    image: caddy@sha256:df7f1c2fb114453b951de51a98efc010db1655a92c2e86be6706714e2417a78d
+    image: caddy@sha256:0c994536bddb66445885237f1a5dcc1916bccea922661c76b4e9fc24061f9b52
     restart: unless-stopped
     environment:
       APP_DOMAIN: ${APP_DOMAIN}
